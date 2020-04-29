@@ -1172,13 +1172,17 @@ def mal_nms_decoder(y_pred,
     # 1: Convert the box coordinates from the predicted anchor box offsets to predicted absolute coordinates
 
     y_pred_decoded_raw = np.copy(y_pred[:,:,:-8]) # Slice out the classes and the four offsets, throw away the anchor coordinates and variances, resulting in a tensor of shape `[batch, n_boxes, n_classes + 4 coordinates]`
-
+    print("Slice out the classes and the four offsets:\n", y_pred_decoded_raw.shape)
     if input_coords == 'centroids':
         y_pred_decoded_raw[:,:,[-2,-1]] = np.exp(y_pred_decoded_raw[:,:,[-2,-1]] * y_pred[:,:,[-2,-1]]) # exp(ln(w(pred)/w(anchor)) / w_variance * w_variance) == w(pred) / w(anchor), exp(ln(h(pred)/h(anchor)) / h_variance * h_variance) == h(pred) / h(anchor)
         y_pred_decoded_raw[:,:,[-2,-1]] *= y_pred[:,:,[-6,-5]] # (w(pred) / w(anchor)) * w(anchor) == w(pred), (h(pred) / h(anchor)) * h(anchor) == h(pred)
         y_pred_decoded_raw[:,:,[-4,-3]] *= y_pred[:,:,[-4,-3]] * y_pred[:,:,[-6,-5]] # (delta_cx(pred) / w(anchor) / cx_variance) * cx_variance * w(anchor) == delta_cx(pred), (delta_cy(pred) / h(anchor) / cy_variance) * cy_variance * h(anchor) == delta_cy(pred)
         y_pred_decoded_raw[:,:,[-4,-3]] += y_pred[:,:,[-8,-7]] # delta_cx(pred) + cx(anchor) == cx(pred), delta_cy(pred) + cy(anchor) == cy(pred)
+        print("centroid mat ops:\n", y_pred_decoded_raw.shape)
+        
         y_pred_decoded_raw = convert_coordinates(y_pred_decoded_raw, start_index=-4, conversion='centroids2corners')
+        print("centroid mat ops:\n", y_pred_decoded_raw.shape)
+
     elif input_coords == 'minmax':
         y_pred_decoded_raw[:,:,-4:] *= y_pred[:,:,-4:] # delta(pred) / size(anchor) / variance * variance == delta(pred) / size(anchor) for all four coordinates, where 'size' refers to w or h, respectively
         y_pred_decoded_raw[:,:,[-4,-3]] *= np.expand_dims(y_pred[:,:,-7] - y_pred[:,:,-8], axis=-1) # delta_xmin(pred) / w(anchor) * w(anchor) == delta_xmin(pred), delta_xmax(pred) / w(anchor) * w(anchor) == delta_xmax(pred)
@@ -1211,11 +1215,16 @@ def mal_nms_decoder(y_pred,
         for class_id in range(1, n_classes): # For each class except the background class (which has class ID 0)...
             single_class = batch_item[:,[class_id, -4, -3, -2, -1]] # ...keep only the confidences for that class, making this an array of shape `[n_boxes, 5]` and...
             threshold_met = single_class[single_class[:,0] > confidence_thresh] # ...keep only those boxes with a confidence above the set threshold.
+            # print("class_id: ", class_id)
             # print("threshold_met: ", threshold_met)
             # print("threshold_met shape: ", threshold_met.shape)
+            
+            # USING THIS TO GENERATE y_pred_before_nms
+            if class_id == 15:
+                y_pred_before_nms = threshold_met
+
             if threshold_met.shape[0] > 0: # If any boxes made the threshold...
  
-
                 maxima_mal_nms = mal_nms(threshold_met, iou_threshold) # ...perform NMS on them.
                 # print("maxima_mal_nms: ", maxima_mal_nms)
                 # print("maxima_mal_nms shape: ", maxima_mal_nms.shape)
@@ -1236,7 +1245,7 @@ def mal_nms_decoder(y_pred,
             pred = np.array(pred) # Even if empty, `pred` must become a Numpy array.
         y_pred_decoded.append(pred) # ...and now that we're done, append the array of final predictions for this batch item to the output list
 
-    return y_pred_decoded
+    return y_pred_decoded, y_pred_before_nms
 
 
 
