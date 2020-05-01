@@ -19,12 +19,14 @@ See the License for the specific language governing permissions and
 limitations under the License.
 '''
 
-from __future__ import absolute_import, division, print_function, unicode_literals
+from __future__ import division
 import numpy as np
 
 from bounding_box_utils.bounding_box_utils import iou, convert_coordinates
 
 import tensorflow as tf
+# import torch 
+# import torch.nn.functional as F
 
 
 
@@ -41,51 +43,27 @@ def jaccard(box_a, box_b, iscrowd:bool=False):
     Return:
         jaccard overlap: (tensor) Shape: [box_a.size(0), box_b.size(0)]
     """
-    # print("ENTERING JACCARD")
-    # print("box_a", box_a, box_a.shape, box_a.dtype)
-    # print("box_b", box_b, box_b.shape, box_b.dtype)
     box_a=tf.convert_to_tensor(box_a)
     box_b=tf.convert_to_tensor(box_b)
-    # print("box_a this should be a tensor (18,4)",box_a)
     use_batch = True
     if tf.rank(box_a) == 2:
-        # print("tf.rank(box_a) == 2 : TRUE")
         use_batch = False
         box_a = box_a[None, ...]
         box_b = box_b[None, ...]
-        # print("box_a", box_a, box_a.shape)
-        # print("box_b", box_b, box_b.shape)
-    
 
-
-
-
-    intersect_mins = tf.maximum(tf.expand_dims(box_a[:,:2],1), tf.expand_dims(box_b[:,:2],0))
-    # print("box_a_expanded", tf.expand_dims(box_a[:,:2],1))
-    # print("box_b_expanded", tf.expand_dims(box_b[:,:2],0))
-
-
-    intersect_maxs = tf.minimum(tf.expand_dims(box_a[:,2:],1), tf.expand_dims(box_b[:,2:],0))
-
-    # print("intersect_mins",intersect_mins)
-    # print("intersect_maxs",intersect_maxs)
-
-
+    intersect_mins = tf.maximum(tf.compat.v1.expand_dims(box_a[...,:2],2), tf.compat.v1.expand_dims(box_b[...,:2],1))
+    intersect_maxs = tf.minimum(tf.compat.v1.expand_dims(box_a[...,2:],2), tf.compat.v1.expand_dims(box_b[...,2:],1))
     intersect_wh = tf.maximum(intersect_maxs - intersect_mins, 0.)
     inter = intersect_wh[..., 0] * intersect_wh[..., 1]
-    # print("inter",inter)
 
-
-    area_a = tf.broadcast_to(tf.expand_dims((box_a[:, 2]-box_a[:, 0]) *
-              (box_a[:, 3]-box_a[:, 1]),1),tf.shape(inter))  # [A,B]
-    area_b = tf.broadcast_to(tf.expand_dims((box_b[:, 2]-box_b[:, 0]) *
-              (box_b[:, 3]-box_b[:, 1]),0),tf.shape(inter))  # [A,B]
+    area_a = tf.broadcast_to(tf.compat.v1.expand_dims((box_a[:, :, 2]-box_a[:, :, 0]) *
+              (box_a[:, :, 3]-box_a[:, :, 1]),2),tf.shape(inter))  # [A,B]
+    area_b = tf.broadcast_to(tf.compat.v1.expand_dims((box_b[:, :, 2]-box_b[:, :, 0]) *
+              (box_b[:, :, 3]-box_b[:, :, 1]),1),tf.shape(inter))  # [A,B]
     union = tf.reshape(area_a,tf.shape(inter)) + tf.reshape(area_b,tf.shape(inter)) - inter
 
-    # out = inter / area_a if iscrowd else inter / union
-    out = inter / union
-    # print("out",out)
-    return out # if use_batch else tf.squeeze(out,0)
+    out = inter / area_a if iscrowd else inter / union
+    return out if use_batch else tf.squeeze(out,0)
 
 
 def tf_yolact_nms(
@@ -95,58 +73,22 @@ def tf_yolact_nms(
         iou_threshold=0.5,
         score_threshold=float('-inf'),
         top_k=200):
-    print("ENTERING TF YOLACT NMS")
-
     boxes=tf.convert_to_tensor(boxes)
-
     idx = tf.argsort(scores, direction='DESCENDING')[:top_k]
     scores=tf.sort(scores,direction='DESCENDING')[:top_k]
-
-    
-    # print("boxes", boxes.eval())
-    # boxes=tf.gather(boxes,idx,axis=1,batch_dims=1)
-    # tf.convert_to_tensor(scores, np.float32)
-    print("boxes", boxes)
-    print("scores", scores)
-
-    # sess.close()
-
-
-
-
-    
-    # print("idx", idx)
-    # print("scores", scores)
-    # print("boxes", boxes)
+    boxes=tf.gather(boxes,idx,axis=1,batch_dims=1)
 
 
 
     # num_classes= tf.shape(idx)[0]
 
-    iou=jaccard(boxes,boxes,False)
-    print("iou:", iou)
-
+    iou=jaccard(boxes,boxes,True)
     mask_iou = tf.linalg.band_part(iou, -1, 0)
     iou = iou - mask_iou
+
     iou_max = tf.math.reduce_max(iou, axis=1)
-
-
-
-    sess = tf.InteractiveSession()  
-    print("iou:", iou.eval(), iou.dtype)
-
-    print("iou_max:", iou_max.eval(), iou_max.dtype)
-    sess.close()
-
-
-    keep = tf.constant(iou_max <= iou_threshold, tf.bool, tf.shape(iou_max))
+    keep=tf.constant(iou_max<=iou_threshold,tf.bool,tf.shape(iou_max))
     keep=tf.cast(keep,tf.float32)
-
-
-    sess = tf.InteractiveSession()  
-    print("keep:", keep.eval(), keep.dtype)
-    sess.close()
-
     if score_threshold>=0.:
         keep *= tf.cast(scores > score_threshold, tf.float32)
 
@@ -166,11 +108,10 @@ def tf_yolact_nms(
     # # classes=classes[:max_output_size]
     print("boxes: ", boxes)
     print("scores: ", scores)
-    # scores = scores.reshape(scores.shape[0], -1)
+    scores = scores.reshape(scores.shape[0], -1)
 
-    # maxima = np.hstack((scores, boxes))
-    
-    return boxes,scores
+    maxima = np.hstack((scores, boxes))
+    return maxima # boxes,classes,scores
 
 
 def tf_yolact_decoder(y_pred,
@@ -290,16 +231,15 @@ def tf_yolact_decoder(y_pred,
 
 
 
-                tf_boxes = tf.convert_to_tensor(boxes, np.float32)
-                print("tf_boxes", tf_boxes)
-                tf_scores = tf.convert_to_tensor(scores, np.float32)
-                print("tf_scores", tf_scores)
+                # tf_boxes = tf.convert_to_tensor(boxes, np.float32)
+                # print("tf_boxes", tf_boxes)
+                # tf_scores = tf.convert_to_tensor(scores, np.float32)
+                # print("tf_scores", tf_scores)
 
                 max_output_size = 20
-                tf_boxes, tf_scores = tf_yolact_nms(boxes,scores,max_output_size,iou_threshold=0.5,score_threshold=float('-inf'),top_k=200)
-                maxima = 20
-                tf.print(tf_boxes)
-                tf.print(tf_scores)
+                maxima = tf_yolact_nms(boxes,scores,max_output_size,iou_threshold=0.5,score_threshold=float('-inf'),top_k=200)
+                
+
 
                 maxima_output = np.zeros((maxima.shape[0], maxima.shape[1] + 1)) # Expand the last dimension by one element to have room for the class ID. This is now an arrray of shape `[n_boxes, 6]`
                 maxima_output[:,0] = class_id # Write the class ID to the first column...
@@ -352,23 +292,23 @@ def yolact_nms(boxes, scores, iou_threshold:float=0.5, top_k:int=200, second_thr
 
         # FIX THIS
         jac = iou(boxes, boxes)
-        print("jac: ", jac)
-        print("jac_shape: ", jac.shape)
+        # print("jac: ", jac)
+        # print("jac_shape: ", jac.shape)
         
         # jac.triu_(diagonal=1)
         jac = np.triu(jac, k=1)
-        print("jac_triu: ", jac)
+        # print("jac_triu: ", jac)
 
 
         # jac_max, _ = jac.max(dim=1)
         jac_max = jac.max(1)
-        print("jac_max: ", jac_max)
+        # print("jac_max: ", jac_max)
 
 
         # Now just filter out the ones higher than the threshold
         keep = (jac_max <= iou_threshold)
-        print("iou_threshold: ", iou_threshold)
-        print("keep: ", keep)
+        # print("iou_threshold: ", iou_threshold)
+        # print("keep: ", keep)
 
 
         # We should also only keep detections over the confidence threshold, but at the cost of
@@ -1174,7 +1114,7 @@ def mal_nms_decoder(y_pred,
     y_pred_decoded_raw = np.copy(y_pred[:,:,:-8]) # Slice out the classes and the four offsets, throw away the anchor coordinates and variances, resulting in a tensor of shape `[batch, n_boxes, n_classes + 4 coordinates]`
     print("Slice out the classes and the four offsets:\n", y_pred_decoded_raw.shape)
     if input_coords == 'centroids':
-        y_pred_decoded_raw[:,:,[-2,-1]] = (y_pred_decoded_raw[:,:,[-2,-1]] * y_pred[:,:,[-2,-1]]) # exp(ln(w(pred)/w(anchor)) / w_variance * w_variance) == w(pred) / w(anchor), exp(ln(h(pred)/h(anchor)) / h_variance * h_variance) == h(pred) / h(anchor)
+        y_pred_decoded_raw[:,:,[-2,-1]] = np.exp(y_pred_decoded_raw[:,:,[-2,-1]] * y_pred[:,:,[-2,-1]]) # exp(ln(w(pred)/w(anchor)) / w_variance * w_variance) == w(pred) / w(anchor), exp(ln(h(pred)/h(anchor)) / h_variance * h_variance) == h(pred) / h(anchor)
         print (y_pred_decoded_raw)
         y_pred_decoded_raw[:,:,[-2,-1]] *= y_pred[:,:,[-6,-5]] # (w(pred) / w(anchor)) * w(anchor) == w(pred), (h(pred) / h(anchor)) * h(anchor) == h(pred)
         y_pred_decoded_raw[:,:,[-4,-3]] *= y_pred[:,:,[-4,-3]] * y_pred[:,:,[-6,-5]] # (delta_cx(pred) / w(anchor) / cx_variance) * cx_variance * w(anchor) == delta_cx(pred), (delta_cy(pred) / h(anchor) / cy_variance) * cy_variance * h(anchor) == delta_cy(pred)
