@@ -1145,19 +1145,25 @@ def mal_nms_decoder(y_pred,
     if normalize_coords:
         y_pred_decoded_raw[:,:,[-4,-2]] *= img_width # Convert xmin, xmax back to absolute coordinates
         y_pred_decoded_raw[:,:,[-3,-1]] *= img_height # Convert ymin, ymax back to absolute coordinates
-    # print("y_pred_decoded_raw shape: ", y_pred_decoded_raw.shape)
+
+    print("normalized: ", y_pred_decoded_raw)
     # 3: Apply confidence thresholding and non-maximum suppression per class
 
     n_classes = y_pred_decoded_raw.shape[-1] - 4 # The number of classes is the length of the last axis minus the four box coordinates
-    # print("n_classes: ", n_classes)
+    print("n_classes: ", n_classes)
     y_pred_decoded = [] # Store the final predictions in this list
     for batch_item in y_pred_decoded_raw: # `batch_item` has shape `[n_boxes, n_classes + 4 coords]`
         # print("batch_item: ", batch_item)
-        # print("batch_item shape: ", batch_item.shape)
+        print("batch_item shape: ", batch_item.shape)
         pred = [] # Store the final predictions for this batch item here
         for class_id in range(1, n_classes): # For each class except the background class (which has class ID 0)...
             single_class = batch_item[:,[class_id, -4, -3, -2, -1]] # ...keep only the confidences for that class, making this an array of shape `[n_boxes, 5]` and...
+            print("single_class: ", single_class[:5][:])
+            
+
             threshold_met = single_class[single_class[:,0] > confidence_thresh] # ...keep only those boxes with a confidence above the set threshold.
+            print("threshold_met: ", threshold_met[:5][:])
+            
             # print("class_id: ", class_id)
             # print("threshold_met: ", threshold_met)
             # print("threshold_met shape: ", threshold_met.shape)
