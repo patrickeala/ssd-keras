@@ -1114,19 +1114,19 @@ def mal_nms_decoder(y_pred,
     # 1: Convert the box coordinates from the predicted anchor box offsets to predicted absolute coordinates
 
     y_pred_decoded_raw = np.copy(y_pred[:,:,:-8]) # Slice out the classes and the four offsets, throw away the anchor coordinates and variances, resulting in a tensor of shape `[batch, n_boxes, n_classes + 4 coordinates]`
-    print("Slice out the classes and the four offsets:\n", y_pred_decoded_raw.shape)
+    # print("Slice out the classes and the four offsets:\n", y_pred_decoded_raw.shape)
     if input_coords == 'centroids':
         y_pred_decoded_raw[:,:,[-2,-1]] = np.exp(y_pred_decoded_raw[:,:,[-2,-1]] * y_pred[:,:,[-2,-1]]) # exp(ln(w(pred)/w(anchor)) / w_variance * w_variance) == w(pred) / w(anchor), exp(ln(h(pred)/h(anchor)) / h_variance * h_variance) == h(pred) / h(anchor)
-        print ("After np.exp(): ", y_pred_decoded_raw)
+        # print ("After np.exp(): ", y_pred_decoded_raw)
         y_pred_decoded_raw[:,:,[-2,-1]] *= y_pred[:,:,[-6,-5]] # (w(pred) / w(anchor)) * w(anchor) == w(pred), (h(pred) / h(anchor)) * h(anchor) == h(pred)
-        print ("After -6,-5: ", y_pred_decoded_raw)
+        # print ("After -6,-5: ", y_pred_decoded_raw)
         y_pred_decoded_raw[:,:,[-4,-3]] *= y_pred[:,:,[-4,-3]] * y_pred[:,:,[-6,-5]] # (delta_cx(pred) / w(anchor) / cx_variance) * cx_variance * w(anchor) == delta_cx(pred), (delta_cy(pred) / h(anchor) / cy_variance) * cy_variance * h(anchor) == delta_cy(pred)
-        print ("After -4,-3: ", y_pred_decoded_raw)
+        # print ("After -4,-3: ", y_pred_decoded_raw)
         y_pred_decoded_raw[:,:,[-4,-3]] += y_pred[:,:,[-8,-7]] # delta_cx(pred) + cx(anchor) == cx(pred), delta_cy(pred) + cy(anchor) == cy(pred)
-        print ("After -8,-7: ", y_pred_decoded_raw)
+        # print ("After -8,-7: ", y_pred_decoded_raw)
         y_pred_decoded_raw = convert_coordinates(y_pred_decoded_raw, start_index=-4, conversion='centroids2corners')
-        print("converted coords: ", y_pred_decoded_raw)
-        print("centroid mat ops:\n", y_pred_decoded_raw.shape)
+        # print("converted coords: ", y_pred_decoded_raw)
+        # print("centroid mat ops:\n", y_pred_decoded_raw.shape)
 
     elif input_coords == 'minmax':
         y_pred_decoded_raw[:,:,-4:] *= y_pred[:,:,-4:] # delta(pred) / size(anchor) / variance * variance == delta(pred) / size(anchor) for all four coordinates, where 'size' refers to w or h, respectively
@@ -1148,23 +1148,23 @@ def mal_nms_decoder(y_pred,
         y_pred_decoded_raw[:,:,[-4,-2]] *= img_width # Convert xmin, xmax back to absolute coordinates
         y_pred_decoded_raw[:,:,[-3,-1]] *= img_height # Convert ymin, ymax back to absolute coordinates
 
-    print("normalized: ", y_pred_decoded_raw)
+    # print("normalized: ", y_pred_decoded_raw)
     # 3: Apply confidence thresholding and non-maximum suppression per class
 
     n_classes = y_pred_decoded_raw.shape[-1] - 4 # The number of classes is the length of the last axis minus the four box coordinates
-    print("n_classes: ", n_classes)
+    # print("n_classes: ", n_classes)
     y_pred_decoded = [] # Store the final predictions in this list
     for batch_item in y_pred_decoded_raw: # `batch_item` has shape `[n_boxes, n_classes + 4 coords]`
         # print("batch_item: ", batch_item)
-        print("batch_item shape: ", batch_item.shape)
+        # print("batch_item shape: ", batch_item.shape)
         pred = [] # Store the final predictions for this batch item here
         for class_id in range(1, n_classes): # For each class except the background class (which has class ID 0)...
             single_class = batch_item[:,[class_id, -4, -3, -2, -1]] # ...keep only the confidences for that class, making this an array of shape `[n_boxes, 5]` and...
-            print("single_class ", class_id , ": " , single_class[:5][:])
+            # print("single_class ", class_id , ": " , single_class[:5][:])
             
 
             threshold_met = single_class[single_class[:,0] > confidence_thresh] # ...keep only those boxes with a confidence above the set threshold.
-            print("threshold_met: ", threshold_met[:5][:])
+            # print("threshold_met: ", threshold_met[:5][:])
             
             # print("class_id: ", class_id)
             # print("threshold_met: ", threshold_met)
@@ -1174,23 +1174,24 @@ def mal_nms_decoder(y_pred,
 
 
             if threshold_met.shape[0] > 0: # If any boxes made the threshold...
-                start = datetime.time()
+                # start = time.time()
                 maxima_mal_nms = mal_nms(threshold_met, iou_threshold) # ...perform NMS on them.
                 # print("maxima_mal_nms: ", maxima_mal_nms)
                 # print("maxima_mal_nms shape: ", maxima_mal_nms.shape)
-                end = datetime.time()
+                end = time.time()
 
             if class_id == 15:
                 y_pred_before_nms = threshold_met
-                print("Python NMS time: ", end - start, )
+                # print("Python NMS time: ", (end - start), " seconds")
+                # print("Python NMS time: ", (end - start) * 1e+9, " ns")
 
 
                 maxima_output = np.zeros((maxima_mal_nms.shape[0], maxima_mal_nms.shape[1] + 1)) # Expand the last dimension by one element to have room for the class ID. This is now an arrray of shape `[n_boxes, 6]`
                 maxima_output[:,0] = class_id # Write the class ID to the first column...
                 maxima_output[:,1:] = maxima_mal_nms # ...and write the maxima to the other columns...
                 pred.append(maxima_output) # ...and append the maxima for this class to the list of maxima for this batch item.
-        print("Done with all classes\n")
-        print("pred.shape: ", pred.shape)
+        # print("Done with all classes\n")
+        # print("pred.shape: ", pred.shape)
         # Once we're through with all classes, keep only the `top_k` maxima with the highest scores
         if pred: # If there are any predictions left after confidence-thresholding...
             pred = np.concatenate(pred, axis=0)
