@@ -1178,7 +1178,7 @@ def mal_nms_decoder(y_pred,
                 maxima_mal_nms = mal_nms(threshold_met, iou_threshold) # ...perform NMS on them.
                 # print("maxima_mal_nms: ", maxima_mal_nms)
                 # print("maxima_mal_nms shape: ", maxima_mal_nms.shape)
-                end = time.time()
+                # end = time.time()
 
             if class_id == 15:
                 y_pred_before_nms = threshold_met
