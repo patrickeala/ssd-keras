@@ -28,6 +28,8 @@ import tensorflow as tf
 # import torch 
 # import torch.nn.functional as F
 
+import time
+
 
 
 
@@ -1158,7 +1160,7 @@ def mal_nms_decoder(y_pred,
         pred = [] # Store the final predictions for this batch item here
         for class_id in range(1, n_classes): # For each class except the background class (which has class ID 0)...
             single_class = batch_item[:,[class_id, -4, -3, -2, -1]] # ...keep only the confidences for that class, making this an array of shape `[n_boxes, 5]` and...
-            print("single_class: ", single_class[:5][:])
+            print("single_class ", class_id , ": " , single_class[:5][:])
             
 
             threshold_met = single_class[single_class[:,0] > confidence_thresh] # ...keep only those boxes with a confidence above the set threshold.
@@ -1169,21 +1171,26 @@ def mal_nms_decoder(y_pred,
             # print("threshold_met shape: ", threshold_met.shape)
             
             # USING THIS TO GENERATE y_pred_before_nms
-            if class_id == 15:
-                y_pred_before_nms = threshold_met
+
 
             if threshold_met.shape[0] > 0: # If any boxes made the threshold...
- 
+                start = datetime.time()
                 maxima_mal_nms = mal_nms(threshold_met, iou_threshold) # ...perform NMS on them.
                 # print("maxima_mal_nms: ", maxima_mal_nms)
                 # print("maxima_mal_nms shape: ", maxima_mal_nms.shape)
+                end = datetime.time()
 
+            if class_id == 15:
+                y_pred_before_nms = threshold_met
+                print("Python NMS time: ", end - start, )
 
 
                 maxima_output = np.zeros((maxima_mal_nms.shape[0], maxima_mal_nms.shape[1] + 1)) # Expand the last dimension by one element to have room for the class ID. This is now an arrray of shape `[n_boxes, 6]`
                 maxima_output[:,0] = class_id # Write the class ID to the first column...
                 maxima_output[:,1:] = maxima_mal_nms # ...and write the maxima to the other columns...
                 pred.append(maxima_output) # ...and append the maxima for this class to the list of maxima for this batch item.
+        print("Done with all classes\n")
+        print("pred.shape: ", pred.shape)
         # Once we're through with all classes, keep only the `top_k` maxima with the highest scores
         if pred: # If there are any predictions left after confidence-thresholding...
             pred = np.concatenate(pred, axis=0)
