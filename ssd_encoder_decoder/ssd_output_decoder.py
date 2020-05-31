@@ -993,33 +993,33 @@ def mal_nms(boxes, overlapThresh=0.45):
     y1 = boxes[:,2]
     x2 = boxes[:,3]
     y2 = boxes[:,4]
-    print("x1:" , x1)
-    print("x2:" , x2)
-    print("y1:" , y1)
-    print("y2:" , y2)
+    # print("x1:" , x1)
+    # print("x2:" , x2)
+    # print("y1:" , y1)
+    # print("y2:" , y2)
 
 	# compute the area of the bounding boxes and sort the bounding
 	# boxes by the bottom-right y-coordinate of the bounding box
     area = (x2 - x1 + 1) * (y2 - y1 + 1)
-    print("area:" , area)
+    # print("area:" , area)
 
     probs = boxes[:,0]
 
     idxs = np.argsort(probs)
-    print("probs: ", probs)
+    # print("probs: ", probs)
 	# keep looping while some indexes still remain in the indexes
 	# list
     counter = 1
     while len(idxs) > 0:
 		# grab the last index in the indexes list and add the
 		# index value to the list of picked indexes
-        print("START", counter)
-        print("idxs: ", idxs)
+        # print("START", counter)
+        # print("idxs: ", idxs)
         last = len(idxs) - 1
         i = idxs[last]
-        print("i: ", i)
+        # print("i: ", i)
         pick.append(i)
-        print("pick: ", pick)
+        # print("pick: ", pick)
 		# find the largest (x, y) coordinates for the start of
 		# the bounding box and the smallest (x, y) coordinates
 		# for the end of the bounding box
@@ -1027,28 +1027,28 @@ def mal_nms(boxes, overlapThresh=0.45):
         yy1 = np.maximum(y1[i], y1[idxs[:last]])
         xx2 = np.minimum(x2[i], x2[idxs[:last]])
         yy2 = np.minimum(y2[i], y2[idxs[:last]])
-        print("xx1: ", xx1)
-        print("yy1: ", yy1)
-        print("xx2: ", xx2)
-        print("yy2: ", yy2)
+        # print("xx1: ", xx1)
+        # print("yy1: ", yy1)
+        # print("xx2: ", xx2)
+        # print("yy2: ", yy2)
 
 		# compute the width and height of the bounding box
         w = np.maximum(0, xx2 - xx1 + 1)
-        print("w:" , w)
+        # print("w:" , w)
         h = np.maximum(0, yy2 - yy1 + 1)
-        print("h:" , h)
+        # print("h:" , h)
 		# compute the ratio of overlap
         overlap = (w * h) / area[idxs[:last]]
-        print("overlap: ", overlap)
+        # print("overlap: ", overlap)
 		# delete all indexes from the index list that have
         idxs = np.delete(idxs, np.concatenate(([last],
             np.where(overlap > overlapThresh)[0])))
-        print("END", counter, "\n")
+        # print("END", counter, "\n")
         counter += 1
 	# return only the bounding boxes that were picked using the
 	# integer data type
 	# return boxes[pick]
-    print("EXITING Mal NMS")
+    # print("EXITING Mal NMS")
     return boxes[pick]
     # return boxes[pick].astype("int")
 
@@ -1180,16 +1180,16 @@ def mal_nms_decoder(y_pred,
                 # print("maxima_mal_nms shape: ", maxima_mal_nms.shape)
                 # end = time.time()
 
-            if class_id == 15:
-                y_pred_before_nms = threshold_met
+
+                # y_pred_before_nms = threshold_met
                 # print("Python NMS time: ", (end - start), " seconds")
                 # print("Python NMS time: ", (end - start) * 1e+9, " ns")
-
 
                 maxima_output = np.zeros((maxima_mal_nms.shape[0], maxima_mal_nms.shape[1] + 1)) # Expand the last dimension by one element to have room for the class ID. This is now an arrray of shape `[n_boxes, 6]`
                 maxima_output[:,0] = class_id # Write the class ID to the first column...
                 maxima_output[:,1:] = maxima_mal_nms # ...and write the maxima to the other columns...
                 pred.append(maxima_output) # ...and append the maxima for this class to the list of maxima for this batch item.
+
         # print("Done with all classes\n")
         # print("pred.shape: ", pred.shape)
         # Once we're through with all classes, keep only the `top_k` maxima with the highest scores
@@ -1202,7 +1202,7 @@ def mal_nms_decoder(y_pred,
             pred = np.array(pred) # Even if empty, `pred` must become a Numpy array.
         y_pred_decoded.append(pred) # ...and now that we're done, append the array of final predictions for this batch item to the output list
 
-    return y_pred_decoded, y_pred_before_nms
+    return y_pred_decoded
 
 
 
