@@ -871,7 +871,7 @@ class DataGenerator:
                 * 'matched_anchors': Only available if `labels_encoder` is an `SSDInputEncoder` object. The same as 'encoded_labels',
                     but containing anchor box coordinates for all matched anchor boxes instead of ground truth coordinates.
                     This can be useful to visualize what anchor boxes are being matched to each ground truth box. Only available
-                    in training mode.
+                    in training mode.   
                 * 'processed_labels': The processed, but not yet encoded labels. This is a list that contains for each
                     batch image a Numpy array with all ground truth boxes for that image. Only available if ground truth is available.
                 * 'filenames': A list containing the file names (full paths) of the images in the batch.
